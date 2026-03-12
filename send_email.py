@@ -74,15 +74,19 @@ SakuraFrp 自动签到报告
             part.add_header('Content-Disposition', f'attachment; filename= {os.path.basename(log_file)}')
             msg.attach(part)
         
-        # 发送邮件
-        with smtplib.SMTP(smtp_server, smtp_port) as server:
+        if smtp_port == 465:
+            server = smtplib.SMTP_SSL(smtp_server, smtp_port)
+        else:
+            server = smtplib.SMTP(smtp_server, smtp_port)
             server.starttls()
+        
+        with server:
             server.login(sender_email, sender_password)
             server.send_message(msg)
         
         print(f"✅ 邮件发送成功: {receiver_email}")
         return True
-        
+
     except Exception as e:
         print(f"❌ 邮件发送失败: {e}")
         return False
