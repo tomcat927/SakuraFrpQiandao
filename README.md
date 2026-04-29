@@ -101,28 +101,92 @@ SakuraFrp-Qiandao/
 └── README.md
 ```
 
-## 常见问题
+## 配置说明
 
-### Playwright 下载 Chromium 失败
+### 定时任务时间
 
-如果出现 `timed out`、`ECONNRESET` 或 `Failed to download Chrome for Testing`，通常是网络到 Playwright/CDN 下载源不稳定。推荐直接使用系统 Chrome，并在 `.env` 中按需设置 `CHROME_BINARY_PATH`。
+修改 `.github/workflows/checkin.yml` 中的 cron 表达式：
 
-### 登录失败
-
-检查 `SAKURAFRP_USER` 和 `SAKURAFRP_PASS` 是否正确，必要时关闭无头模式查看页面行为：
-
-```env
-HEADLESS=false
+```yaml
+schedule:
+  - cron: '0 1 * * *'  # UTC 1:00 = 北京时间 9:00
 ```
 
-### 验证码识别失败
+常用时间对照：
+- `0 1 * * *` - 每天 9:00（北京时间）
+- `0 13 * * *` - 每天 21:00（北京时间）
+- `0 1,13 * * *` - 每天 9:00 和 21:00
 
-更换更强的视觉模型，或增加 `MAX_RETRIES`。模型需要支持图片输入，并兼容 OpenAI Chat Completions API。
+### AI 模型推荐
 
-### 未收到邮件
+支持任何兼容 OpenAI API 的多模态模型：
 
-确认邮箱开启 SMTP，并使用授权码或应用专用密码，不要直接使用普通登录密码。
+- **OpenAI**: `gpt-4o`, `gpt-4-vision-preview`
+- **阿里通义**: `qwen-vl-plus`, `qwen-vl-max`
+- **智谱 AI**: `glm-4v`
+- **ModelScope**: 各种开源视觉模型
+
+## 故障排查
+
+### 问题：验证码识别失败
+
+**原因**：AI 模型识别不准确
+
+**解决方案**：
+1. 尝试更换更强大的视觉模型
+2. 优化 Prompt 提示词
+3. 增加重试次数
+
+### 问题：GitHub Actions 运行失败
+
+**原因**：环境问题或依赖安装失败
+
+**解决方案**：
+1. 检查 Secrets 是否正确配置
+2. 查看 Actions 日志中的具体错误
+3. 确保 requirements.txt 中的依赖版本正确
+
+### 问题：登录失败
+
+**原因**：账号密码错误或网络问题
+
+**解决方案**：
+1. 验证 Secrets 中的用户名密码
+2. 检查账号是否正常
+3. 查看日志中的详细错误信息
+
+### 问题：未收到邮件通知
+
+**原因**：邮箱配置错误或 SMTP 服务未开启
+
+**解决方案**：
+1. 检查 `EMAIL_USERNAME` 和 `EMAIL_PASSWORD` 是否正确配置
+2. 确认使用的是**应用专用密码**，不是登录密码
+3. 检查邮箱是否开启了 SMTP 服务
+4. 查看 Actions 日志中的邮件发送错误信息
+5. 检查垃圾邮件文件夹
 
 ## 注意事项
 
-请勿频繁触发签到，避免被限流。妥善保管账号密码、API Key 和邮箱授权码。
+⚠️ **重要提示**：
+
+1. 请勿频繁触发 Actions，避免被限流
+2. 妥善保管 API 密钥和邮箱密码，不要泄露
+3. 定期检查签到日志或邮件，确保正常运行
+4. 遵守 SakuraFrp 的服务条款
+5. **邮箱应用密码不是登录密码**，Gmail 需要开启两步验证后生成应用专用密码
+6. 邮件通知是可选的，不配置也不影响签到功能
+
+## 许可证
+
+MIT License
+
+## 贡献
+
+欢迎提交 Issue 和 Pull Request！
+
+## 相关链接
+
+- [SakuraFrp 官网](https://www.natfrp.com/)
+- [Selenium 文档](https://www.selenium.dev/documentation/)
+- [GitHub Actions 文档](https://docs.github.com/en/actions)
