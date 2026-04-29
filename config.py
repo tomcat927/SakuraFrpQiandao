@@ -6,7 +6,7 @@ from dataclasses import dataclass
 # 尝试加载 .env 文件
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(override=True)
 except ImportError:
     pass
 

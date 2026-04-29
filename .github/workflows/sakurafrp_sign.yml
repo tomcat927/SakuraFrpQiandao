@@ -22,17 +22,11 @@ jobs:
           python-version: '3.11'
           cache: 'pip'
       
-      - name: 安装Chrome和ChromeDriver
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable curl unzip
-          # 使用webdriver-manager自动管理ChromeDriver版本
-          pip install webdriver-manager chromedriver-binary-auto
-      
       - name: 安装 Python 依赖
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
+          python -m playwright install-deps chromium
       
       - name: 运行签到脚本
         env:
@@ -41,6 +35,7 @@ jobs:
           BASE_URL: ${{ secrets.BASE_URL }}
           API_KEY: ${{ secrets.API_KEY }}
           MODEL: ${{ secrets.MODEL }}
+          IMAGE_AS_BASE64: ${{ secrets.IMAGE_AS_BASE64 || 'false' }}
           CI: 'true'
           HEADLESS: 'true'
         run: |

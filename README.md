@@ -1,32 +1,32 @@
 # SakuraFrp 自动签到脚本
 
-使用 AI 视觉识别自动完成 SakuraFrp 的验证码签到。
+使用 Playwright 驱动浏览器，并通过 AI 视觉识别完成 SakuraFrp 九宫格验证码签到。
 
 ## 功能特性
 
-- ✅ 自动登录 SakuraFrp 账户
-- ✅ AI 视觉识别九宫格验证码
-- ✅ 智能点击匹配的验证码格子
-- ✅ 失败自动重试（最多10次）可在环境变量中自行调整
-- ✅ 支持 GitHub Actions 定时执行
-- ✅ 详细的日志记录
+- 自动登录 SakuraFrp 账户
+- AI 视觉识别九宫格验证码
+- 自动点击匹配的验证码格子
+- 失败自动重试，默认最多 10 次
+- 支持 GitHub Actions 定时执行
+- 支持邮件通知和日志归档
 
 ## 本地运行
 
 ### 1. 环境准备
 
 ```bash
-# 克隆项目
-git clone <your-repo-url>
-cd SakuraFrpQiandao
-
-# 创建虚拟环境
 python -m venv .venv
-.venv\Scripts\activate  # Windows
-# source .venv/bin/activate  # Linux/Mac
-
-# 安装依赖
+.venv\Scripts\activate
 pip install -r requirements.txt
+```
+
+本项目默认优先使用本机已安装的 Chrome，不需要下载 ChromeDriver，也不强制执行 `playwright install chromium`。
+
+如果本机没有 Chrome，或希望使用 Playwright 托管浏览器，可以执行：
+
+```bash
+python -m playwright install chromium
 ```
 
 ### 2. 配置环境变量
@@ -34,41 +34,32 @@ pip install -r requirements.txt
 创建 `.env` 文件：
 
 ```env
-# SakuraFrp 账户信息
 SAKURAFRP_USER=your_username
 SAKURAFRP_PASS=your_password
 
-# AI 模型配置（支持 OpenAI 兼容的 API）
 BASE_URL=https://api.example.com/v1
 API_KEY=your_api_key
 MODEL=your_model_name
 
-# 最大重试次数 (可选)
-MAX_RETRIES=默认为10
-
-# Chrome 路径（可选）
-CHROME_BINARY_PATH=
-
-# 运行模式（可选）
+MAX_RETRIES=10
 HEADLESS=false
+CHROME_BINARY_PATH=
 
 # 是否将验证码图片转换为 base64（可选）
 # 可接受：true/false, 1/0, yes/no, on/off
-# 注意：通过第三方适配器接入的服务（例如 copilot-api 或 LiteLLM）不支持直接使用图片 URL。
-# 为确保兼容性，必须将验证码图片转换为 base64 后再发送。
+# 通过第三方适配器接入的服务可能不支持直接使用图片 URL，此时设为 true。
 IMAGE_AS_BASE64=false
 ```
 
-### 3. 下载 ChromeDriver
+`CHROME_BINARY_PATH` 可选。留空时会自动查找系统 Chrome；如果你的 Chrome 不在默认位置，可以显式指定：
 
-从 [ChromeDriver 官网](https://chromedriver.chromium.org/) 下载对应版本的 ChromeDriver。
+```env
+CHROME_BINARY_PATH=C:\Program Files\Google\Chrome\Application\chrome.exe
+```
 
-- Windows: `chromedriver.exe`
-- Linux/macOS: `chromedriver`
+Playwright 只复用 Chrome 可执行文件，不会读取你日常 Chrome 的用户目录、Cookie、历史记录或扩展。
 
-可将驱动放在项目根目录，或加入系统 `PATH`。
-
-### 4. 运行脚本
+### 3. 运行脚本
 
 ```bash
 python main.py
@@ -76,127 +67,50 @@ python main.py
 
 ## GitHub Actions 部署
 
-### 1. Fork 本项目
+工作流文件位于 `.github/workflows/sakurafrp_sign.yml`，默认每天北京时间 9:00 执行，也支持手动触发。
 
-点击右上角 Fork 按钮，将项目 Fork 到你的账户。
+需要配置以下 Secrets：
 
-### 2. 配置 Secrets
+| 名称 | 说明 |
+| --- | --- |
+| `SAKURAFRP_USER` | SakuraFrp 用户名 |
+| `SAKURAFRP_PASS` | SakuraFrp 密码 |
+| `BASE_URL` | OpenAI 兼容 API 地址 |
+| `API_KEY` | API 密钥 |
+| `MODEL` | 多模态模型名称 |
 
-在你的 GitHub 仓库中：
+邮件通知为可选配置：
 
-1. 进入 `Settings` → `Secrets and variables` → `Actions`
-2. 点击 `New repository secret` 添加以下密钥：
+| 名称 | 说明 |
+| --- | --- |
+| `EMAIL_USERNAME` | 发件邮箱 |
+| `EMAIL_PASSWORD` | 邮箱授权码或应用密码 |
+| `RECEIVER_EMAIL` | 收件邮箱，默认发给自己 |
+| `SMTP_SERVER` | SMTP 服务器，默认 `smtp.gmail.com` |
+| `SMTP_PORT` | SMTP 端口，默认 `587` |
 
-#### 必需配置
+Actions 使用 GitHub runner 自带 Chrome，并执行 `python -m playwright install-deps chromium` 安装 Linux 运行依赖，避免每次下载 Playwright Chromium 大包。
 
-| 密钥名称 | 说明 | 示例 |
-|---------|------|------|
-| `SAKURAFRP_USER` | SakuraFrp 用户名 | `your_username` |
-| `SAKURAFRP_PASS` | SakuraFrp 密码 | `your_password` |
-| `BASE_URL` | AI API 地址 | `https://api.openai.com/v1` |
-| `API_KEY` | AI API 密钥 | `sk-xxx...` |
-| `MODEL` | 模型名称 | `gpt-4o` |
+## 项目结构
 
-#### 邮件通知配置（可选）
-
-| 密钥名称 | 说明 | 示例 | 是否必需 |
-|---------|------|------|---------|
-| `EMAIL_USERNAME` | 发件邮箱 | `your-email@gmail.com` | 是 |
-| `EMAIL_PASSWORD` | 邮箱应用密码 | `abcd efgh ijkl mnop` | 是 |
-| `RECEIVER_EMAIL` | 收件邮箱 | `notify@example.com` | 否（默认发给自己） |
-| `SMTP_SERVER` | SMTP 服务器 | `smtp.gmail.com` | 否（默认 Gmail） |
-| `SMTP_PORT` | SMTP 端口 | `587` | 否（默认 587） |
-
-### 3. 启用 Actions
-
-1. 进入 `Actions` 标签页
-2. 点击 `I understand my workflows, go ahead and enable them`
-
-### 4. 测试运行
-
-- **手动触发**：进入 Actions → 选择工作流 → 点击 `Run workflow`
-- **自动运行**：每天北京时间 9:00 自动执行
-
-### 5. 查看结果
-
-- 在 Actions 页面查看运行状态
-- 点击具体的运行记录查看详细日志
-- 下载 `checkin-logs` 查看完整日志文件
-- **接收邮件通知**：每次运行后会自动发送日志邮件到你的邮箱
-
-## 邮件通知配置
-
-### Gmail 配置步骤
-
-1. **开启两步验证**
-   - 登录 Gmail → Google 账户设置
-   - 安全性 → 两步验证（必须先开启）
-
-2. **生成应用专用密码**
-   - 两步验证 → 应用专用密码
-   - 选择"邮件"和"其他"
-   - 生成 16 位密码（格式：`abcd efgh ijkl mnop`）
-
-3. **添加到 GitHub Secrets**
-   - `EMAIL_USERNAME`: 你的 Gmail 地址
-   - `EMAIL_PASSWORD`: 刚才生成的 16 位应用密码
-
-### 其他邮箱配置
-
-**QQ 邮箱**
-```
-SMTP_SERVER: smtp.qq.com
-SMTP_PORT: 587 或 465
-需要开启 SMTP 服务并获取授权码
-```
-
-**163 邮箱**
-```
-SMTP_SERVER: smtp.163.com
-SMTP_PORT: 465
-需要开启 SMTP 服务并获取授权码
-```
-
-**Outlook/Hotmail**
-```
-SMTP_SERVER: smtp-mail.outlook.com
-SMTP_PORT: 587
-使用账户密码即可
-```
-
-### 邮件内容
-
-邮件会包含：
-- ✅/❌ 签到状态（成功/失败）
-- 📅 执行时间
-- 📋 最近 2000 字符的日志摘要
-- 📎 完整日志文件作为附件
-
-### 禁用邮件通知
-
-如果不需要邮件通知，只需不配置 `EMAIL_USERNAME` 和 `EMAIL_PASSWORD`，脚本会自动跳过邮件发送。
-
-## 项目文件结构
-
-```
+```text
 SakuraFrp-Qiandao/
-├── .github/
-│   └── workflows/
-│       └── checkin.yml          # GitHub Actions 工作流
-├── debug_sakura.py              # 主签到脚本
-├── send_email.py                # 邮件通知脚本
-├── requirements.txt             # Python 依赖
-├── .env                         # 本地环境变量（不上传）
-├── .gitignore                   # Git 忽略规则
-├── checkin.log                  # 运行日志（自动生成）
-└── README.md                    # 项目说明
+├── .github/workflows/sakurafrp_sign.yml
+├── automation.py          # Playwright 签到主流程
+├── captcha_handler.py     # GeeTest 验证码识别和点击
+├── config.py              # 环境变量和日志配置
+├── human_simulator.py     # 简单人类操作模拟
+├── main.py                # 程序入口
+├── send_email.py          # 邮件通知
+├── requirements.txt       # Python 依赖
+└── README.md
 ```
 
 ## 配置说明
 
 ### 定时任务时间
 
-修改 `.github/workflows/checkin.yml` 中的 cron 表达式：
+修改 `.github/workflows/sakurafrp_sign.yml` 中的 cron 表达式：
 
 ```yaml
 schedule:
@@ -212,75 +126,46 @@ schedule:
 
 支持任何兼容 OpenAI API 的多模态模型：
 
-- **OpenAI**: `gpt-4o`, `gpt-4-vision-preview`
-- **阿里通义**: `qwen-vl-plus`, `qwen-vl-max`
-- **智谱 AI**: `glm-4v`
-- **GitHub Copilot**: `gpt-4o` — 可通过第三方适配层接入 OpenAI 兼容接口（例如 [copilot-api](https://github.com/caozhiyuan/copilot-api) 将 Copilot 请求转为 OpenAI API，或使用 [LiteLLM](https://github.com/BerriAI/litellm) 作为轻量/本地模型适配方案）。根据部署与隐私需求选择合适方案。
-- **ModelScope**: 各种开源视觉模型
+- OpenAI: `gpt-4o`
+- 阿里通义: `qwen-vl-plus`, `qwen-vl-max`
+- 智谱 AI: `glm-4v`
+- GitHub Copilot: 可通过第三方 OpenAI 兼容适配层接入
+- ModelScope: 各种开源视觉模型
 
 ## 故障排查
 
-### 问题：验证码识别失败
+### 验证码识别失败
 
-**原因**：AI 模型识别不准确
+尝试更换更强的视觉模型，或增加 `MAX_RETRIES`。模型需要支持图片输入，并兼容 OpenAI Chat Completions API。
 
-**解决方案**：
-1. 尝试更换更强大的视觉模型
-2. 优化 Prompt 提示词
-3. 增加重试次数
+### 模型返回非标准响应
 
-### 问题：GitHub Actions 运行失败
+脚本会记录完整响应结构。如果响应中包含 `error` 或 `errors`，会直接终止，因为刷新验证码无法修复模型 API 错误。
 
-**原因**：环境问题或依赖安装失败
+### Playwright 下载 Chromium 失败
 
-**解决方案**：
-1. 检查 Secrets 是否正确配置
-2. 查看 Actions 日志中的具体错误
-3. 确保 requirements.txt 中的依赖版本正确
+如果出现 `timed out`、`ECONNRESET` 或 `Failed to download Chrome for Testing`，通常是网络到 Playwright/CDN 下载源不稳定。推荐直接使用系统 Chrome，并在 `.env` 中按需设置 `CHROME_BINARY_PATH`。
 
-### 问题：登录失败
+### 登录失败
 
-**原因**：账号密码错误或网络问题
+检查 `SAKURAFRP_USER` 和 `SAKURAFRP_PASS` 是否正确，必要时关闭无头模式查看页面行为：
 
-**解决方案**：
-1. 验证 Secrets 中的用户名密码
-2. 检查账号是否正常
-3. 查看日志中的详细错误信息
+```env
+HEADLESS=false
+```
 
-### 问题：未收到邮件通知
+### 未收到邮件
 
-**原因**：邮箱配置错误或 SMTP 服务未开启
-
-**解决方案**：
-1. 检查 `EMAIL_USERNAME` 和 `EMAIL_PASSWORD` 是否正确配置
-2. 确认使用的是**应用专用密码**，不是登录密码
-3. 检查邮箱是否开启了 SMTP 服务
-4. 查看 Actions 日志中的邮件发送错误信息
-5. 检查垃圾邮件文件夹
+确认邮箱开启 SMTP，并使用授权码或应用专用密码，不要直接使用普通登录密码。
 
 ## 注意事项
 
-⚠️ **重要提示**：
-
-1. 请勿频繁触发 Actions，避免被限流
-2. 妥善保管 API 密钥和邮箱密码，不要泄露
-3. 定期检查签到日志或邮件，确保正常运行
-4. 遵守 SakuraFrp 的服务条款
-5. **邮箱应用密码不是登录密码**，Gmail 需要开启两步验证后生成应用专用密码
-6. 邮件通知是可选的，不配置也不影响签到功能
-
-## 许可证
-
-MIT License
-
-## 贡献
-
-欢迎提交 Issue 和 Pull Request！
+请勿频繁触发签到，避免被限流。妥善保管账号密码、API Key 和邮箱授权码。
 
 ## 相关链接
 
 - [SakuraFrp 官网](https://www.natfrp.com/)
-- [Selenium 文档](https://www.selenium.dev/documentation/)
+- [Playwright 文档](https://playwright.dev/python/)
 - [GitHub Actions 文档](https://docs.github.com/en/actions)
-- [copilot-api — caozhiyuan/copilot-api](https://github.com/caozhiyuan/copilot-api)
-- [LiteLLM — BerriAI/litellm](https://github.com/BerriAI/litellm)
+- [copilot-api](https://github.com/caozhiyuan/copilot-api)
+- [LiteLLM](https://github.com/BerriAI/litellm)

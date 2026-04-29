@@ -42,9 +42,12 @@ jobs:
           else
             TAG="${GITHUB_REF#refs/tags/}"
           fi
+          if [ -z "$TAG" ] || [ "$TAG" = "$GITHUB_REF" ]; then
+            TAG="${GITHUB_SHA::12}"
+          fi
 
-          # If TAG is empty, do not create a git tag. If TAG is set, check remote.
-          if [ -z "$TAG" ]; then
+          # For manual runs without a tag input, publish a SHA tag but do not create a git tag.
+          if [ "$TAG" = "${GITHUB_SHA::12}" ]; then
             echo "NEED_PUSH_GIT_TAG=false" >> $GITHUB_ENV
           else
             # Check if tag exists on remote 'origin'; if missing, mark to push after Docker push
