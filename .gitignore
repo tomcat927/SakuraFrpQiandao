@@ -1,8 +1,13 @@
-.env
-.venv
 checkin.log
 chromedriver.exe
+captured_captcha.jpg
 error_screenshot.png
 error_page_source.html
-test/
+.env
 __pycache__/
+*.pyc
+.vscode/
+.idea/
+node_modules/
+.venv
+test/

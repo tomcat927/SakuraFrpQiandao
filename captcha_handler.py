@@ -63,8 +63,8 @@ class CaptchaHandler:
                 time.sleep(2)
                 return False
             
-            # 调用视觉模型识别
-            recognition_result = self._recognize_captcha(img_url)
+            # 调用视觉模型识别，imagebase64 由配置控制
+            recognition_result = self._recognize_captcha(img_url, imagebase64=self.config.image_as_base64)
             if not recognition_result:
                 logger.warning("识别失败，刷新网页重试...")
                 time.sleep(2)
@@ -87,22 +87,33 @@ class CaptchaHandler:
             logger.error(f"处理验证码时发生错误: {e}", exc_info=True)
             return False
 
-    def _recognize_captcha(self, img_url: str) -> Optional[Dict]:
-        """使用视觉模型识别验证码"""
+    def _recognize_captcha(self, img_url: str, imagebase64: bool = False) -> Optional[Dict]:
+        """使用视觉模型识别验证码，支持 imagebase64 方式"""
         try:
             prompt = (
                 '这是一个九宫格验证码，请按从左到右、从上到下的顺序识别每个格子里的物品名称，'
                 '最后识别左下角的参考图。输出格式为JSON：{"1":"名称", "2":"名称", ..., "10":"参考图名称"}。'
                 '名称要简洁，参考图名称必须是九宫格里已有的名称。若有类似物品（如气球与热气球），请统一名称。'
             )
-            
+            image_url_value = img_url
+            if imagebase64:
+                import requests, base64
+                try:
+                    resp = requests.get(img_url)
+                    resp.raise_for_status()
+                    img_bytes = resp.content
+                    img_b64 = base64.b64encode(img_bytes).decode('utf-8')
+                    image_url_value = f"data:image/jpeg;base64,{img_b64}"
+                except Exception as e:
+                    logger.error(f"图片转base64失败: {e}")
+                    raise ModelApiError("图片转base64失败") from e
             response = self.client.chat.completions.create(
                 model=self.config.model,
                 messages=[{
                     'role': 'user',
                     'content': [
                         {'type': 'text', 'text': prompt},
-                        {'type': 'image_url', 'image_url': {'url': img_url}}
+                        {'type': 'image_url', 'image_url': {'url': image_url_value}}
                     ]
                 }],
                 stream=False
@@ -127,18 +138,12 @@ class CaptchaHandler:
                 raise ModelApiError("模型 API 响应缺少 message.content")
 
             logger.info(f"模型原始输出: {result_content}")
-        
-            # 提取被 <|begin_of_box|> 和 <|end_of_box|> 包裹的 JSON 字符串
-            pattern = r'<\|begin_of_box\|>(.*?)<\|end_of_box\|>'
-            match = re.search(pattern, result_content, re.DOTALL)
-            if match:
-                json_str = match.group(1).strip()
-            else:
-                # 如果没有标记，则直接使用原始内容（兼容旧格式）
-                json_str = result_content.strip()
-        
-            # 清理字符串（替换单引号、去除多余空白）
-            cleaned_str = json_str.replace("'", '"').strip()
+            json_text = self._extract_json(result_content)
+            if not json_text:
+                logger.error("无法从模型输出中提取有效 JSON")
+                raise ModelApiError("模型输出不包含有效 JSON")
+
+            cleaned_str = json_text.replace("'", '"').strip()
         
             result_dict = json.loads(cleaned_str)
             if isinstance(result_dict, dict) and result_dict.get("error"):
@@ -159,6 +164,35 @@ class CaptchaHandler:
             else:
                 logger.error(f"模型 API 调用失败: {e}", exc_info=True)
             raise ModelApiError("模型 API 调用失败") from e
+
+    @staticmethod
+    def _extract_json(text: str) -> Optional[str]:
+        """从模型输出中提取 JSON，兼容代码块、Qwen box 标记和普通说明文本。"""
+        if not isinstance(text, str):
+            text = str(text)
+
+        box_match = re.search(r'<\|begin_of_box\|>(.*?)<\|end_of_box\|>', text, flags=re.DOTALL)
+        if box_match:
+            return box_match.group(1).strip()
+
+        code_block_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', text, flags=re.DOTALL)
+        if code_block_match:
+            return code_block_match.group(1).strip()
+
+        start = text.find('{')
+        if start == -1:
+            return None
+
+        stack = 0
+        for i in range(start, len(text)):
+            if text[i] == '{':
+                stack += 1
+            elif text[i] == '}':
+                stack -= 1
+                if stack == 0:
+                    return text[start:i + 1].strip()
+
+        return None
 
     def _click_captcha_items(self, page: Page, recognition_result: Dict) -> bool:
         """

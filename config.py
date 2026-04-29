@@ -32,6 +32,7 @@ class Config:
     model: str
     chrome_binary_path: Optional[str] = None
     max_retries: int = 10
+    image_as_base64: bool = False
     
     @classmethod
     def from_env(cls) -> 'Config':
@@ -41,6 +42,12 @@ class Config:
             if required and not value:
                 raise ValueError(f"环境变量 {key} 未设置或为空")
             return value
+
+        def get_bool_env(key: str, default: bool = False) -> bool:
+            raw_value = os.environ.get(key, "").strip().lower()
+            if not raw_value:
+                return default
+            return raw_value in {"1", "true", "yes", "on"}
         
         return cls(
             sakurafrp_user=get_env("SAKURAFRP_USER"),
@@ -49,5 +56,6 @@ class Config:
             api_key=get_env("API_KEY"),
             model=get_env("MODEL"),
             chrome_binary_path=get_env("CHROME_BINARY_PATH", required=False),
-            max_retries=int(get_env("MAX_RETRIES", required=False) or 10)
+            max_retries=int(get_env("MAX_RETRIES", required=False) or 10),
+            image_as_base64=get_bool_env("IMAGE_AS_BASE64", default=False)
         )
