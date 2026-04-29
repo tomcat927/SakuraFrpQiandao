@@ -1,5 +1,8 @@
 .env
 .venv
 checkin.log
+chromedriver.exe
+error_screenshot.png
+error_page_source.html
 test/
 __pycache__/
