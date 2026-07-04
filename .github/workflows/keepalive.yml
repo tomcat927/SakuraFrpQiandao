@@ -1,0 +1,41 @@
+name: Keep repository active
+
+on:
+  schedule:
+    - cron: "23 3 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: keepalive
+  cancel-in-progress: false
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout keepalive branch
+        uses: actions/checkout@v4
+        with:
+          ref: keepalive
+
+      - name: Update keepalive timestamp
+        run: |
+          mkdir -p .github/keepalive
+          date -u +"%Y-%m-%dT%H:%M:%SZ" > .github/keepalive/last-run.txt
+
+      - name: Commit keepalive update
+        run: |
+          if git diff --quiet -- .github/keepalive/last-run.txt; then
+            echo "No keepalive changes to commit."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive/last-run.txt
+          git commit -m "chore: keep repository active"
+          git push origin HEAD:keepalive
