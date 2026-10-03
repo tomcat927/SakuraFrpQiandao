@@ -1,0 +1,32 @@
+name: Keepalive
+
+on:
+  # 每天检查一次仓库活跃度，避免 scheduled workflow 因 60 天不活跃被 GitHub 停用
+  schedule:
+    - cron: '23 3 * * *'   # UTC 3:23 = 北京时间 11:23
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 距上次提交超过 50 天时，打一个空提交重置计时器
+        run: |
+          last=$(git log -1 --format=%ct)
+          now=$(date +%s)
+          days=$(( (now - last) / 86400 ))
+          echo "距上次提交 ${days} 天"
+          if [ "${days}" -lt 50 ]; then
+            echo "仓库仍然活跃，无需保活"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --allow-empty -m "chore: keepalive（重置 GitHub 60 天停用计时器）"
+          git push
